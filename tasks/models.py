@@ -1,5 +1,7 @@
 from django.contrib.auth.models import User
 from django.db import models
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
 
 
 STATUS_CHOICES = (
@@ -36,6 +38,7 @@ class TaskHistory(models.Model):
     time_of_change = models.DateTimeField(auto_now=True)
 
     @classmethod
+    @receiver(pre_save, sender=Task)
     def createNewHistory(historyClass, task: Task):
         if task._old_status != task.status:
             historyClass.objects.create(

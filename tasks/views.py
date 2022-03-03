@@ -1,11 +1,17 @@
 from django.db import transaction
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
-from django_filters.rest_framework import (CharFilter, ChoiceFilter,
-                                           DjangoFilterBackend, FilterSet, DateFromToRangeFilter)
+from django_filters.rest_framework import (
+    CharFilter,
+    ChoiceFilter,
+    DjangoFilterBackend,
+    FilterSet,
+    DateFromToRangeFilter,
+)
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.serializers import ModelSerializer
-from rest_framework.viewsets import ModelViewSet
+from rest_framework.viewsets import ModelViewSet, GenericViewSet
+from rest_framework.mixins import ListModelMixin
 
 from tasks.models import STATUS_CHOICES, Task, TaskHistory
 
@@ -60,6 +66,7 @@ class TaskHistorySerializer(ModelSerializer):
         fields = ["id", "task", "old_status", "new_status", "time_of_change"]
         read_only_fields = ["task", "old_status", "new_status"]
 
+
 class TaskHistoryFilter(FilterSet):
     time_of_change = DateFromToRangeFilter()
     old_status = ChoiceFilter(choices=STATUS_CHOICES)
@@ -67,13 +74,10 @@ class TaskHistoryFilter(FilterSet):
 
     class Meta:
         model = TaskHistory
-        fields = (
-            "task",
-            "old_status",
-            "new_status"
-        )
+        fields = ("task", "old_status", "new_status")
 
-class TaskHistoryViewSet(ModelViewSet):
+
+class TaskHistoryViewSet(ListModelMixin, GenericViewSet):
     queryset = TaskHistory.objects.all()
     serializer_class = TaskHistorySerializer
     permission_classes = (IsAuthenticated,)
@@ -82,7 +86,7 @@ class TaskHistoryViewSet(ModelViewSet):
     filterset_class = TaskHistoryFilter
 
     def get_queryset(self):
-        return TaskHistory.objects.filter()
+        return TaskHistory.objects.filter(user=self.request.user)
 
 
 @receiver(pre_save, sender=Task)
@@ -114,5 +118,4 @@ def helper(sender, instance: Task, **kwargs):
         with transaction.atomic():
             if changes:
                 Task.objects.bulk_update(changes, ["priority"], batch_size=100)
-        TaskHistory.createNewHistory(instance)
         return
