@@ -32,17 +32,8 @@ class Task(models.Model):
 
 
 class TaskHistory(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     task = models.ForeignKey(Task, on_delete=models.CASCADE)
     old_status = models.CharField(max_length=100, choices=STATUS_CHOICES, default=STATUS_CHOICES[0][0])
     new_status = models.CharField(max_length=100, choices=STATUS_CHOICES, default=STATUS_CHOICES[0][0])
     time_of_change = models.DateTimeField(auto_now=True)
-
-    @classmethod
-    @receiver(pre_save, sender=Task)
-    def createNewHistory(historyClass, task: Task):
-        if task._old_status != task.status:
-            historyClass.objects.create(
-                task=task,
-                old_status=task._old_status,
-                new_status=task.status,
-            )

@@ -1,3 +1,4 @@
+from asyncio.base_tasks import _task_get_stack
 from django.db import transaction
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
@@ -10,8 +11,7 @@ from django_filters.rest_framework import (
 )
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.serializers import ModelSerializer
-from rest_framework.viewsets import ModelViewSet, GenericViewSet
-from rest_framework.mixins import ListModelMixin
+from rest_framework.viewsets import ModelViewSet, GenericViewSet, ReadOnlyModelViewSet
 
 from tasks.models import STATUS_CHOICES, Task, TaskHistory
 
@@ -77,7 +77,7 @@ class TaskHistoryFilter(FilterSet):
         fields = ("task", "old_status", "new_status")
 
 
-class TaskHistoryViewSet(ListModelMixin, GenericViewSet):
+class TaskHistoryViewSet(ReadOnlyModelViewSet):
     queryset = TaskHistory.objects.all()
     serializer_class = TaskHistorySerializer
     permission_classes = (IsAuthenticated,)
@@ -119,3 +119,14 @@ def helper(sender, instance: Task, **kwargs):
             if changes:
                 Task.objects.bulk_update(changes, ["priority"], batch_size=100)
         return
+
+
+@receiver(pre_save, sender=Task)
+def createNewHistory(sender, instance, **kwargs):
+    if instance._old_status != instance.status:
+        TaskHistory.objects.create(
+            task=instance,
+            old_status=instance._old_status,
+            new_status=instance.status,
+            user=instance.user
+        )
